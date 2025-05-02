@@ -75,6 +75,74 @@ Use a `Path` for the outline and a `Rectangle` fill clipped by a `RectangleGeome
   - `DBT_DEVICEREMOVECOMPLETE` for loss of a paired device.
   - Check `dbcc_name` to match your ESP’s address.
 
+## Shared Bluetooth Protocol Header (C++)
+
+To keep service and ESP32 in sync, define all UUIDs, packet structs, and constants in a single header (e.g. `include/BatteryProtocol.h`):
+
+```cpp
+#pragma once
+
+#include <cstdint>
+#include <array>
+
+// BLE Service & Characteristic UUIDs
+static constexpr GUID BATTERY_SERVICE_UUID = /* 128-bit UUID */;
+static constexpr GUID STATUS_CHAR_UUID   = /* 128-bit UUID */;
+static constexpr GUID COMMAND_CHAR_UUID  = /* 128-bit UUID */;
+
+// Packet formats
+struct BatteryStatusPacket {
+    uint8_t  acLineStatus;
+    uint8_t  batteryFlag;
+    uint8_t  batteryLifePercent;
+    uint32_t batteryLifeTime;
+    uint32_t batteryFullLifeTime;
+};
+
+struct ControlCommand {
+    uint8_t commandId;
+    uint8_t param1;
+    uint8_t param2;
+};
+
+**ControlCommand Usage**
+- `commandId`: identifies the command type, e.g. `0x01=SetRange`, `0x02=ChargeFully`, `0x03=HighFreqMode`.
+- `param1`, `param2`: command-specific parameters (e.g. min/max % for SetRange, boolean flag for ChargeFully, on/off for HighFreqMode).
+
+**High Frequency Mode Indication**
+- `commandId = 0x03` signifies HighFreqMode.
+- ESP32 sends this via a GATT **Indication** on `COMMAND_CHAR_UUID` (CCCD value `0x0002`).
+- Windows service must enable indications (not just notifications) to receive these updates.
+
+static_assert(sizeof(BatteryStatusPacket) == 1 + 1 + 1 + 4 + 4,
+              "BatteryStatusPacket size mismatch");
+```
+
+- Place this header in a shared `include/` folder at repo root.  
+- In your Windows service project, add `#include "BatteryProtocol.h"` and link against definitions.  
+- In your ESP32 code, copy or symlink `include/BatteryProtocol.h` and use the same structs and UUIDs.  
+
+This ensures both sides use identical protocol definitions and avoids drift.  
+
+## Symlinking Shared Headers on Windows
+
+- Git tracks symlinks if `core.symlinks` is enabled and the filesystem supports it.
+- **Enable Developer Mode** on Win10+ or run as Administrator to allow symlinks without elevation.
+
+- **Command Prompt** (Directory link):
+  ```bat
+  cd path\to\ESP32\project
+  mklink /D include ..\..\include
+  ```
+
+- **PowerShell**:
+  ```powershell
+  New-Item -ItemType SymbolicLink -Path include -Target ..\..\include
+  ```
+
+- Use `#include "BatteryProtocol.h"` in ESP32 code as the header now appears under `include/`.
+- Ensure `.git/config` sets `core.symlinks=true`, then `git add include` and commit; clones will recreate the link.
+
 ## Requesting Administrator Privileges
 
 ### Application Manifest
@@ -88,6 +156,43 @@ Use a `Path` for the outline and a `Rectangle` fill clipped by a `RectangleGeome
     </security>
   </trustInfo>
   ```
+
+## P/Invoke Wrapper for RPC Error Strings
+
+To simplify error handling when using native RPC stubs, wrap your P/Invoke call and string cleanup:
+
+```csharp
+using System;
+using System.Runtime.InteropServices;
+
+static class NativeRpc
+{
+    // Generated P/Invoke stub
+    [DllImport("BatteryControlClient.dll", CharSet=CharSet.Unicode)]
+    private static extern int SetDesiredBatteryLevel(
+      int min, int max, out IntPtr errorPtr);
+
+    // RPC helper to free unmanaged strings
+    [DllImport("Rpcrt4.dll", CallingConvention = CallingConvention.Winapi)]
+    private static extern int RpcStringFree(ref IntPtr stringPtr);
+
+    public static bool SetDesiredBatteryLevelSafe(int min, int max, out string error)
+    {
+        error = null;
+        IntPtr errPtr;
+        int hr = SetDesiredBatteryLevel(min, max, out errPtr);
+
+        if (errPtr != IntPtr.Zero)
+        {
+            error = Marshal.PtrToStringUni(errPtr);
+            RpcStringFree(ref errPtr);
+        }
+
+        return hr >= 0;
+    }
+}
+```
+
 ## Estimating SOC from Charger-Side Measurements
 
 - If you only measure adapter voltage (V_in) and input current (I_in), you can approximate battery SOC with coulomb-counting and a simple converter model:

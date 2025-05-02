@@ -1,15 +1,15 @@
 # General Rules
 
 1. **Code Structure:**
-    - Always use code_structure.md to help you find your way around the code.
+    - Always use docs/code_structure.md to help you find your way around the code.
 2. **Update Code Structure:**
-    - After making changes to the code, update code_structure.md to reflect the changes you have made.
+    - After making changes to the code, update docs/code_structure.md to reflect the changes you have made.
 
 # Windsurf Rules for Plan Execution
 
 ## Plan File Execution Protocol
 
-When the user requests to execute a plan file (such as `add_undo_plan.md`), follow these steps:
+When the user requests to execute a plan file (such as `add_something_plan.md`), follow these steps:
 
 1. **Iterate Over Tasks and Subtasks:**
     - Go through each task and subtask in the plan file in order.
@@ -21,7 +21,7 @@ When the user requests to execute a plan file (such as `add_undo_plan.md`), foll
 
 2. **Decompose as Needed:**
     - Before executing any task or subtask, check if it has subtasks.
-    - If it does not, estimate its complexity using code_structure.md.
+    - If it does not, estimate its complexity using docs/code_structure.md.
     - If the task is complex or would benefit from further breakdown, add appropriate subtasks in the plan file before execution, then proceed to execute them.
     - If it already has subtasks, proceed to execute them in order.
 
@@ -30,7 +30,7 @@ When the user requests to execute a plan file (such as `add_undo_plan.md`), foll
         1. If it’s `[ ]`, switch it to `[o]` as soon as you begin work.
         2. Do the work.
         3. When fully done, update `[o]` to `[x]`.
-    - After marking `[x]`, update code_structure.md to reflect your changes.
+    - After marking `[x]`, update docs/code_structure.md to reflect your changes.
 
 4. **Post-Subtask Review and Parent Task Completion:**
     - When all subtasks of a parent task are marked `[x]`, review the parent task to ensure completeness.
